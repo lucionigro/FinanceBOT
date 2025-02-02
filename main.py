@@ -3,11 +3,10 @@ import pandas as pd
 from datetime import datetime
 import os
 import requests
+import config
 
 # Configuración inicial
-CSV_PATH = "my_portfolio.csv"
-TELEGRAM_TOKEN = "7762073373:AAE2sDZr-ea7G8EagEiK-WIDtcdIuTkOack"  # Reemplaza con tu token
-TELEGRAM_CHAT_ID = "5443110528"          # Reemplaza con tu chat ID
+
 
 # ------------------------------------------------------------------------------------
 # Sección 1: Análisis Técnico Mejorado
@@ -182,17 +181,16 @@ def generate_recommendation(hist, latest_data):
 # ------------------------------------------------------------------------------------
 
 def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": config.TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "Markdown"
     }
     response = requests.post(url, json=payload)
     return response.ok
 
-
-def load_sp500_tickers(csv_path="DB/stocks.csv"):
+def load_sp500_tickers(csv_path=config.CSV_PATH):
     """Carga los tickers del S&P 500 desde un archivo CSV."""
     try:
         df = pd.read_csv(csv_path)
@@ -313,7 +311,7 @@ def main():
                 "Horizonte Temporal:\n" + time_analysis + "\n\n"
                 "Análisis Fundamental:\n" + fundamental_analysis
             )
-            if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+            if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
                 success = send_telegram_message(telegram_msg)
                 if success:
                     print("\n✅ Notificación enviada a Telegram.")
@@ -346,7 +344,7 @@ def main():
                     print(f"   - {reason}")
             
             # Enviar por Telegram
-            if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+            if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
                 telegram_msg = "📈 *Recomendaciones Corto Plazo:*\n\n"
                 for asset in recommendations:
                     telegram_msg += (
