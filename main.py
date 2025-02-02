@@ -191,16 +191,75 @@ def send_telegram_message(message):
     response = requests.post(url, json=payload)
     return response.ok
 
+
+def load_sp500_tickers(csv_path="DB/stocks.csv"):
+    """Carga los tickers del S&P 500 desde un archivo CSV."""
+    try:
+        df = pd.read_csv(csv_path)
+        if 'Symbol' in df.columns:
+            return df['Symbol'].tolist()
+        else:
+            print("Error: El archivo CSV no tiene una columna 'Symbol'.")
+            return []
+    except Exception as e:
+        print(f"Error al cargar el archivo CSV: {e}")
+        return []
+
+
+def get_investment_recommendations():
+    tickers = load_sp500_tickers()
+    
+    if not tickers:
+        print("No se pudieron cargar los tickers. Usando lista por defecto.")
+        tickers = ['NVDA', 'TSLA', 'AAPL', 'AMD', 'META', 'AMZN', 'GOOG', 'MSFT', 'BTC-USD', 'ETH-USD']
+    recommendations = []
+    
+    for ticker in tickers:
+        try:
+            data, latest = get_technical_analysis(ticker)
+            if data is None:
+                continue
+                
+            recommendation, reasons, time_analysis = generate_recommendation(data, latest)
+            
+            # Filtrar solo recomendaciones COMPRAR con horizonte corto plazo
+            if recommendation == "COMPRAR" and "corto plazo" in time_analysis:
+                price = latest['Close']
+                entry_price = latest['LowerBand'] if latest['BB_Percent'] < 30 else latest['SMA20']
+                
+                reasons_filtered = [
+                    r for r in reasons 
+                    if any(keyword in r for keyword in ['SMA20', 'RSI', 'MACD', 'Bollinger', 'Volumen'])
+                ][:3]  # Mostrar solo las 3 señales más fuertes
+                
+                recommendations.append({
+                    'ticker': ticker,
+                    'price': f"${price:.2f}",
+                    'entry': f"${entry_price:.2f}",
+                    'target': f"${latest['UpperBand']:.2f}",
+                    'reasons': reasons_filtered
+                })
+                
+                if len(recommendations) >= 5:
+                    break
+                    
+        except Exception as e:
+            continue
+    
+    return recommendations
+
+
 # ------------------------------------------------------------------------------------
 # Interfaz de Usuario (CLI) Actualizada
 # ------------------------------------------------------------------------------------
 
 def main():
     while True:
-        print("\n=== BOT FINANCIERO v2 ===")
+        print("\n=== BOT FINANCIERO  ===")
         print("1. Analizar un ticker")
         print("2. Registrar una compra")
-        print("3. Salir")
+        print("3. Obtener recomendaciones del mercado Americano")
+        print("4. Salir")
         
         choice = input("Selecciona una opción: ")
         
@@ -214,15 +273,31 @@ def main():
             
             recommendation, reasons, time_analysis = generate_recommendation(data, latest)
             price = latest['Close']
+
+            entry_price = None
+            target_price = None
+            if recommendation == "COMPRAR":
+                if latest['BB_Percent'] < 30:
+                    entry_price = latest['LowerBand']
+                else:
+                    entry_price = latest['SMA20']
+                target_price = latest['UpperBand']
             
             # Resultado en consola
             print(f"\n📊 Análisis para {ticker} (Precio: ${price:.2f})")
             print(f"🚨 Recomendación: {recommendation}")
+
+            if recommendation == "COMPRAR":
+                print(f"💡 Precio de entrada ideal: ${entry_price:.2f}")
+                print(f"🎯 Objetivo técnico: ${target_price:.2f}")
+                
             print("\n🔍 Detalles Técnicos:")
             for reason in reasons:
                 print(f"- {reason}")
             print("\n⏳ Horizonte Temporal:")
             print(time_analysis)
+            
+
             
             # Análisis Fundamental
             fundamental_analysis = get_fundamental_analysis(ticker)
@@ -252,7 +327,38 @@ def main():
             save_purchase(ticker, price, quantity)
             print("¡Compra registrada exitosamente!")
         
-        elif choice == "3":
+        elif choice == "3":  # Nueva opción de recomendaciones
+            print("\n🔎 Analizando oportunidades de mercado...")
+            recommendations = get_investment_recommendations()
+            
+            if not recommendations:
+                print("\n⚠️ No se encontraron oportunidades fuertes para corto plazo")
+                continue
+                
+            print(f"\n🚀 Top 5 Recomendaciones Corto Plazo ({datetime.now().strftime('%d/%m')}):")
+            for i, asset in enumerate(recommendations, 1):
+                print(f"\n{i}. {asset['ticker']}")
+                print(f"   Precio Actual: {asset['price']}")
+                print(f"   Precio Entrada Ideal: {asset['entry']}")
+                print(f"   Objetivo Técnico: {asset['target']}")
+                print("   Señales Técnicas:")
+                for reason in asset['reasons']:
+                    print(f"   - {reason}")
+            
+            # Enviar por Telegram
+            if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+                telegram_msg = "📈 *Recomendaciones Corto Plazo:*\n\n"
+                for asset in recommendations:
+                    telegram_msg += (
+                        f"🏅 *{asset['ticker']}*\n"
+                        f"- Precio: {asset['price']}\n"
+                        f"- Entrada: {asset['entry']}\n"
+                        f"- Objetivo: {asset['target']}\n"
+                        f"- Señales:\n   • " + "\n   • ".join(asset['reasons']) + "\n\n"
+                    )
+                send_telegram_message(telegram_msg)
+
+        elif choice == "4":  # Actualizado
             print("¡Hasta luego!")
             break
 
