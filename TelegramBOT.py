@@ -5,7 +5,13 @@ import os
 import requests
 import config
 
-# Configuración inicial
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+import yfinance as yf
+import pandas as pd
+from datetime import datetime
+import config
+import asyncio
 
 
 # ------------------------------------------------------------------------------------
@@ -359,6 +365,74 @@ def main():
         elif choice == "4":  # Actualizado
             print("¡Hasta luego!")
             break
+
+
+
+async def start(update: Update, context):
+    await update.message.reply_text(
+    "🤖 ¡Hola! Soy tu asistente financiero. Puedo ayudarte con:\n"
+    "/analyze [TICKER] - Análisis técnico y fundamental\n"
+    "/recommend - Recomendaciones de mercado\n"
+    "/help - Muestra esta ayuda"
+)
+
+async def analyze_ticker(update: Update, context):
+    ticker = context.args[0].upper() if context.args else None
+    if not ticker:
+        await update.message.reply_text("⚠️ Por favor especifica un ticker: /analyze AAPL")
+        return
+    
+    data, latest = get_technical_analysis(ticker)
+    if data is None:
+        await update.message.reply_text(f"❌ Error obteniendo datos para {ticker}")
+        return
+    
+    recommendation, reasons, time_analysis = generate_recommendation(data, latest)
+    fundamental = get_fundamental_analysis(ticker)
+    price = latest['Close']
+    
+    message = (
+        f"📊 *Análisis de {ticker}*\n"
+        f"💰 Precio Actual: ${price:.2f}\n"
+        f"🚨 *Recomendación: {recommendation}*\n\n"
+        "📈 *Indicadores Técnicos:*\n- " + "\n- ".join(reasons) + "\n\n"
+        "📅 *Horizonte Temporal:*\n" + time_analysis + "\n\n"
+        "📚 *Análisis Fundamental:*\n" + fundamental
+    )
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+async def market_recommendations(update: Update, context):
+    await update.message.reply_text("🔍 Buscando oportunidades de mercado...")
+    recommendations = get_investment_recommendations()
+    
+    if not recommendations:
+        await update.message.reply_text("⚠️ No se encontraron oportunidades fuertes para corto plazo")
+        return
+    
+    message = "🚀 *Top Recomendaciones Corto Plazo*\n\n"
+    for asset in recommendations:
+        message += (
+            f"🏅 *{asset['ticker']}*\n"
+            f"- Precio: {asset['price']}\n"
+            f"- Entrada: {asset['entry']}\n"
+            f"- Objetivo: {asset['target']}\n"
+            f"- Señales:\n   • " + "\n   • ".join(asset['reasons']) + "\n\n"
+        )
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+def main():
+    application = Application.builder().token(config.TELEGRAM_TOKEN).build()
+    
+    # Manejadores de comandos
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", start))
+    application.add_handler(CommandHandler("analyze", analyze_ticker))
+    application.add_handler(CommandHandler("recommend", market_recommendations))
+    
+    # Iniciar el bot
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
