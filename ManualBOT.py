@@ -286,6 +286,12 @@ def main():
             if recommendation == "COMPRAR":
                 print(f"💡 Precio de entrada ideal: ${entry_price:.2f}")
                 print(f"🎯 Objetivo técnico: ${target_price:.2f}")
+                entry_target_msg = f"\n\n🎯 *Precios Clave:*\n- Precio de Entrada: ${entry_price:.2f}\n- Precio Objetivo: ${target_price:.2f}"
+
+            
+            else: entry_target_msg = ""  # Si no es "COMPRAR", no se agrega nada
+
+                
                 
             print("\n🔍 Detalles Técnicos:")
             for reason in reasons:
@@ -302,13 +308,16 @@ def main():
             
             # Enviar a Telegram
             telegram_msg = (
-                f"*Análisis de {ticker}*\n"
+                f"*📊Análisis de {ticker}*\n"
                 f"Precio: ${price:.2f}\n"
-                f"Recomendación: {recommendation}\n\n"
-                "Detalles Técnicos:\n- " + "\n- ".join(reasons) + "\n\n"
-                "Horizonte Temporal:\n" + time_analysis + "\n\n"
-                "Análisis Fundamental:\n" + fundamental_analysis
+                f"🚨Recomendación: {recommendation}"
+                f"{entry_target_msg}\n\n"  # Aquí se inserta el mensaje con precios clave
+
+                "🔍Detalles Técnicos:\n- " + "\n- ".join(reasons) + "\n\n"
+                "⏳Horizonte Temporal:\n" + time_analysis + "\n\n"
+                "📈Análisis Fundamental:\n" + fundamental_analysis 
             )
+
             if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
                 success = send_telegram_message(telegram_msg)
                 if success:

@@ -294,6 +294,11 @@ def main():
             if recommendation == "COMPRAR":
                 print(f"💡 Precio de entrada ideal: ${entry_price:.2f}")
                 print(f"🎯 Objetivo técnico: ${target_price:.2f}")
+                entry_target_msg = f"\n\n🎯 *Precios Clave:*\n- Precio de Entrada: ${entry_price:.2f}\n- Precio Objetivo: ${target_price:.2f}"
+
+            else: entry_target_msg = ""  # Si no es "COMPRAR", no se agrega nada
+
+                
                 
             print("\n🔍 Detalles Técnicos:")
             for reason in reasons:
@@ -310,12 +315,14 @@ def main():
             
             # Enviar a Telegram
             telegram_msg = (
-                f"*Análisis de {ticker}*\n"
+                f"*📊Análisis de {ticker}*\n"
                 f"Precio: ${price:.2f}\n"
-                f"Recomendación: {recommendation}\n\n"
-                "Detalles Técnicos:\n- " + "\n- ".join(reasons) + "\n\n"
-                "Horizonte Temporal:\n" + time_analysis + "\n\n"
-                "Análisis Fundamental:\n" + fundamental_analysis
+                f"🚨Recomendación: {recommendation}"
+                f"{entry_target_msg}\n\n"  # Aquí se inserta el mensaje con precios clave
+
+                "🔍Detalles Técnicos:\n- " + "\n- ".join(reasons) + "\n\n"
+                "⏳Horizonte Temporal:\n" + time_analysis + "\n\n"
+                "📈Análisis Fundamental:\n" + fundamental_analysis 
             )
             if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
                 success = send_telegram_message(telegram_msg)
@@ -323,7 +330,7 @@ def main():
                     print("\n✅ Notificación enviada a Telegram.")
                 else:
                     print("\n❌ Error al enviar a Telegram.")
-                
+                       
         elif choice == "2":
             ticker = input("Ticker comprado (ej: TSLA): ").upper()
             price = float(input("Precio por acción: "))
@@ -390,11 +397,29 @@ async def analyze_ticker(update: Update, context):
     recommendation, reasons, time_analysis = generate_recommendation(data, latest)
     fundamental = get_fundamental_analysis(ticker)
     price = latest['Close']
+
+    entry_price = None
+    target_price = None
+    if recommendation == "COMPRAR":
+        if latest['BB_Percent'] < 30:
+            entry_price = latest['LowerBand']
+        else:
+            entry_price = latest['SMA20']
+        target_price = latest['UpperBand']
+
+    if recommendation == "COMPRAR":
+                print(f"💡 Precio de entrada ideal: ${entry_price:.2f}")
+                print(f"🎯 Objetivo técnico: ${target_price:.2f}")
+                entry_target_msg = f"\n\n🎯 *Precios Clave:*\n- Precio de Entrada: ${entry_price:.2f}\n- Precio Objetivo: ${target_price:.2f}"
+
+            
+    else: entry_target_msg = ""  # Si no es "COMPRAR", no se agrega nada
     
     message = (
         f"📊 *Análisis de {ticker}*\n"
         f"💰 Precio Actual: ${price:.2f}\n"
-        f"🚨 *Recomendación: {recommendation}*\n\n"
+        f"🚨 *Recomendación: {recommendation}*\n"
+        f"{entry_target_msg}\n\n"  # Aquí se inserta el mensaje con precios clave
         "📈 *Indicadores Técnicos:*\n- " + "\n- ".join(reasons) + "\n\n"
         "📅 *Horizonte Temporal:*\n" + time_analysis + "\n\n"
         "📚 *Análisis Fundamental:*\n" + fundamental
