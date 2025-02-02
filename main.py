@@ -26,7 +26,6 @@ logger.setLevel(logging.WARNING)
 # Configurar sesión personalizada para yfinance
 session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0'})
-yf.pdr_override()
 executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 # ------------------------------------------------------------------------------------
