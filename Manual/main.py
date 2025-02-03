@@ -75,14 +75,14 @@ def get_fundamental_analysis(ticker):
             fundamental['Market Cap'] = f"${fundamental['Market Cap']/1e9:.2f}B"
             
         analysis = [
-            "Análisis Fundamental:",
-            f"- Ratio P/E (Valoración): {fundamental['P/E Ratio']}",
-            f"- Ratio P/B (Valoración): {fundamental['P/B Ratio']}",
-            f"- ROE (Rentabilidad): {fundamental['ROE']}",
-            f"- EPS (Beneficios): {fundamental['EPS']}",
-            f"- Capitalización: {fundamental['Market Cap']}",
-            f"- Deuda/Patrimonio: {fundamental['Debt/Equity']}",
-            f"- Dividendo: {fundamental['Dividend Yield'] or '0'}%"
+            "📊 Análisis Fundamental:",
+            f"- 📈 Ratio P/E (Valoración): {fundamental['P/E Ratio']}",
+            f"- 📉 Ratio P/B (Valoración): {fundamental['P/B Ratio']}",
+            f"- 💹 ROE (Rentabilidad): {fundamental['ROE']}",
+            f"- 💵 EPS (Beneficios): {fundamental['EPS']}",
+            f"- 🏦 Capitalización: {fundamental['Market Cap']}",
+            f"- 📊 Deuda/Patrimonio: {fundamental['Debt/Equity']}",
+            f"- 💰 Dividendo: {fundamental['Dividend Yield'] or '0'}%"
         ]
         
         return "\n".join(analysis)
@@ -97,25 +97,26 @@ def generate_recommendation(hist, latest_data):
     # 1. Comparar SMA20 y SMA50
     sma20 = latest_data['SMA20']
     sma50 = latest_data['SMA50']
-    trend = "alcista" if sma20 > sma50 else "bajista"
+    trend = "alcista📈" if sma20 > sma50 else "bajista📉"
     reasons.append(f"SMA20 (${sma20:.2f}) < SMA50 (${sma50:.2f}) → Tendencia {trend}")
     
-    # 2. RSI
+     # 2. RSI
     rsi = latest_data['RSI']
     if rsi < 30:
-        reasons.append(f"RSI: {rsi:.2f} (Sobreventa, <30)")
+        reasons.append(f"📉 RSI: {rsi:.2f} (Sobreventa, <30)")
     elif rsi > 70:
-        reasons.append(f"RSI: {rsi:.2f} (Sobrecompra, >70)")
+        reasons.append(f"📈 RSI: {rsi:.2f} (Sobrecompra, >70)")
     else:
-        reasons.append(f"RSI: {rsi:.2f} (Neutral)")
+        reasons.append(f"📊 RSI: {rsi:.2f} (Neutral)")
+    
     
     # 3. MACD
     macd = latest_data['MACD']
     signal = latest_data['Signal']
     if macd > signal:
-        reasons.append(f"MACD ({macd:.2f}) > Señal ({signal:.2f}) → Momentum alcista")
+        reasons.append(f"MACD ({macd:.2f}) > Señal ({signal:.2f}) → Momentum alcista📉")
     else:
-        reasons.append(f"MACD ({macd:.2f}) < Señal ({signal:.2f}) → Momentum bajista")
+        reasons.append(f"MACD ({macd:.2f}) < Señal ({signal:.2f}) → Momentum bajista📈")
     
     # 4. Bollinger Bands
     bb_percent = latest_data['BB_Percent']
