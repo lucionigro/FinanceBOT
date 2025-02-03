@@ -103,11 +103,11 @@ def generate_recommendation(hist, latest_data):
      # 2. RSI
     rsi = latest_data['RSI']
     if rsi < 30:
-        reasons.append(f"📉 RSI: {rsi:.2f} (Sobreventa, <30)")
+        reasons.append(f" RSI: {rsi:.2f} (Sobreventa, <30)")
     elif rsi > 70:
-        reasons.append(f"📈 RSI: {rsi:.2f} (Sobrecompra, >70)")
+        reasons.append(f" RSI: {rsi:.2f} (Sobrecompra, >70)")
     else:
-        reasons.append(f"📊 RSI: {rsi:.2f} (Neutral)")
+        reasons.append(f" RSI: {rsi:.2f} (Neutral)")
     
     
     # 3. MACD
@@ -344,13 +344,14 @@ def main():
             print(f"\n🚀 Top 5 Recomendaciones Corto Plazo ({datetime.now().strftime('%d/%m')}):")
             for i, asset in enumerate(recommendations, 1):
                 print(f"\n{i}. {asset['ticker']}")
-                print(f"   Precio Actual: {asset['price']}")
-                print(f"   Precio Entrada Ideal: {asset['entry']}")
-                print(f"   Objetivo Técnico: {asset['target']}")
+                print(f"   📊 Precio Actual: {asset['price']}")
+                print(f"   💵Precio Entrada Ideal: {asset['entry']}")
+                print(f"   📈Objetivo Técnico: {asset['target']}")
                 print("   Señales Técnicas:")
                 for reason in asset['reasons']:
                     print(f"   - {reason}")
-            
+        
+
             # Enviar por Telegram
             if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
                 telegram_msg = "📈 *Recomendaciones Corto Plazo:*\n\n"
