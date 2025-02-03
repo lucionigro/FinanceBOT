@@ -1,4 +1,6 @@
+import os
 from flask import Flask, render_template, request
+import requests
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
@@ -247,6 +249,32 @@ def get_investment_recommendations():
     
     return recommendations
 
+
+def get_top_movers():
+    try:
+        url = "https://query2.finance.yahoo.com/v1/finance/screener"
+        params = {
+            "count": 10,
+            "sortField": "percentchange",
+            "sortType": "DESC",
+            "quoteType": "EQUITY"
+        }
+        
+        response = requests.get(url, params=params)
+        data = response.json()['finance']['result'][0]['quotes']
+        
+        return [{
+            'symbol': item['symbol'],
+            'name': item.get('shortName', item['symbol']),
+            'price': round(item['regularMarketPrice'], 2),
+            'change': round(item['regularMarketChange'], 2),
+            'percent_change': round(item['regularMarketChangePercent'], 2)
+        } for item in data]
+        
+    except Exception as e:
+        print(f"Error obteniendo top movers: {str(e)}")
+        return []
+
 # ------------------------------------------------------------------------------------
 # Sección 3: Análisis con DeepSeek (IA)
 # ------------------------------------------------------------------------------------
@@ -300,12 +328,152 @@ def get_ai_analysis(ticker, technical_data, fundamental_analysis):
     except Exception as e:
         print(f"Error en IA: {str(e)}")
         return "No se pudo obtener análisis de IA"
+    
+
+# ------------------------------------------------------------------------------------
+# Sección 4: Gestión de Portfolio
+# ------------------------------------------------------------------------------------
+
+PORTFOLIO_CSV = 'db/portfolio.csv'
+
+def get_portfolio():
+    try:
+        df = pd.read_csv(PORTFOLIO_CSV, parse_dates=['purchase_date'])
+        return df.to_dict('records')
+    except FileNotFoundError:
+        return []
+
+def save_to_portfolio(data):
+    df = pd.DataFrame([data])
+    df.to_csv(PORTFOLIO_CSV, mode='a', header=not os.path.exists(PORTFOLIO_CSV), index=False)
+
+def calculate_portfolio_performance():
+    portfolio = get_portfolio()
+    if not portfolio:
+        return []
+    
+    # Agrupar por ticker
+    grouped = {}
+    for entry in portfolio:
+        ticker = entry['ticker']
+        if ticker not in grouped:
+            grouped[ticker] = []
+        grouped[ticker].append(entry)
+    
+    # Calcular rendimiento
+    performance = []
+    for ticker, entries in grouped.items():
+        try:
+            stock = yf.Ticker(ticker)
+            current_price = stock.history(period='1d')['Close'].iloc[-1]
+            
+            total_quantity = sum([e['quantity'] for e in entries])
+            total_cost = sum([e['quantity'] * e['purchase_price'] for e in entries])
+            current_value = total_quantity * current_price
+            pnl = current_value - total_cost
+            pnl_percent = (pnl / total_cost) * 100 if total_cost != 0 else 0
+            
+            performance.append({
+                'ticker': ticker,
+                'entries': entries,
+                'total_quantity': total_quantity,
+                'avg_cost': total_cost / total_quantity,
+                'current_price': current_price,
+                'pnl': pnl,
+                'pnl_percent': pnl_percent
+            })
+        except Exception as e:
+            print(f"Error calculando {ticker}: {str(e)}")
+    
+    return performance
+
+
+def calculate_total_values(performance):
+    total_current = sum([p['current_price'] * p['total_quantity'] for p in performance])
+    total_cost = sum([p['avg_cost'] * p['total_quantity'] for p in performance])
+    total_pnl = total_current - total_cost
+    return {
+        'total_current': round(total_current, 2),
+        'total_cost': round(total_cost, 2),
+        'total_pnl': round(total_pnl, 2),
+        'total_pnl_percent': round((total_pnl / total_cost) * 100, 2) if total_cost != 0 else 0
+    }
+
+def get_portfolio_history(period='1mo'):
+    portfolio = get_portfolio()
+    if not portfolio:
+        return []
+    
+    # Obtener fechas extremas
+    min_date = pd.to_datetime(min([pd.to_datetime(e['purchase_date']) for e in portfolio]))
+    
+    # Obtener todos los tickers únicos
+    tickers = list(set([e['ticker'] for e in portfolio]))
+    
+    # Obtener datos históricos
+    history = {}
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(start=min_date, period=period)
+            history[ticker] = hist[['Close']]
+        except:
+            continue
+    
+    # Calcular valor diario del portfolio
+    dates = pd.date_range(start=min_date, end=datetime.today())
+    portfolio_value = []
+    
+    for date in dates:
+        daily_value = 0
+        for entry in portfolio:
+            ticker = entry['ticker']
+            if ticker in history:
+                # Encontrar el precio más cercano a la fecha
+                try:
+                    price = history[ticker].loc[:date.strftime('%Y-%m-%d')]['Close'].iloc[-1]
+                    daily_value += entry['quantity'] * price
+                except:
+                    continue
+        portfolio_value.append({
+            'date': date.strftime('%Y-%m-%d'),
+            'value': round(daily_value, 2)
+        })
+    
+    return portfolio_value
+
 
 
 # Rutas Flask
 @app.route('/')
 def index():
-    return render_template('index.html')
+    # Obtener datos del mercado (Índices principales)
+    indices = ['^GSPC', '^DJI', '^IXIC', '^FTSE', 'CL=F', 'GC=F', 'BTC-USD']
+    
+    market_data = []
+    for symbol in indices:
+        try:
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period='1d')
+            info = ticker.info
+            
+            market_data.append({
+                'symbol': symbol,
+                'name': info.get('shortName', symbol),
+                'price': round(data['Close'].iloc[-1], 2),
+                'change': round(data['Close'].iloc[-1] - data['Open'].iloc[-1], 2),
+                'percent_change': round(((data['Close'].iloc[-1] - data['Open'].iloc[-1]) / data['Open'].iloc[-1]) * 100, 2)
+            })
+        except Exception as e:
+            print(f"Error obteniendo datos para {symbol}: {str(e)}")
+            continue
+    
+    # Obtener acciones más activas
+    top_movers = get_top_movers()
+    
+    return render_template('index.html', 
+                         market_data=market_data,
+                         top_movers=top_movers)
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
@@ -334,12 +502,61 @@ def analyze():
                           reasons=reasons,
                           time_analysis=time_analysis,
                           fundamental=fundamental,
-                          ai_analysis=ai_analysis)  # Nuevo parámetro
+                          ai_analysis=ai_analysis)
 
 @app.route('/recommendations')
 def recommendations():
     recs = get_investment_recommendations()
     return render_template('recommendations.html', recommendations=recs)
+
+# Nueva ruta para datos del gráfico
+@app.route('/sp500-data')
+def sp500_data():
+    ticker = yf.Ticker("^GSPC")
+    hist = ticker.history(period="1mo")
+    
+    return {
+        'dates': hist.index.strftime('%Y-%m-%d').tolist(),
+        'prices': hist['Close'].round(2).tolist()
+    }
+
+@app.route('/portfolio', methods=['GET', 'POST'])
+def portfolio():
+    if request.method == 'POST':
+        try:
+            ticker = request.form['ticker'].upper()
+            quantity = float(request.form['quantity'])
+            purchase_date = datetime.strptime(request.form['purchase_date'], '%Y-%m-%d')
+            custom_price = request.form.get('custom_price', None)
+            
+            if custom_price:  # Si el usuario ingresó precio manual
+                purchase_price = float(custom_price)
+            else:  # Lógica original con Yahoo Finance
+                stock = yf.Ticker(ticker)
+                hist = stock.history(start=purchase_date, end=purchase_date + pd.Timedelta(days=1))
+                
+                if hist.empty:
+                    raise ValueError("No hay datos para esta fecha")
+                purchase_price = hist['Close'].iloc[0]
+            
+            new_entry = {
+                'ticker': ticker,
+                'quantity': quantity,
+                'purchase_date': purchase_date.strftime('%Y-%m-%d'),
+                'purchase_price': round(purchase_price, 2)
+            }
+            
+            save_to_portfolio(new_entry)
+            
+        except Exception as e:
+            return render_template('portfolio.html', 
+                                performance=calculate_portfolio_performance(),
+                                error=str(e))
+    
+    return render_template('portfolio.html',
+                         performance=calculate_portfolio_performance(),
+                         totals=calculate_total_values(calculate_portfolio_performance()))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

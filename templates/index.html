@@ -1,14 +1,114 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="search-container text-center">
-    <h1 class="mb-4">Analizador Financiero</h1>
-    <form action="/analyze" method="post" class="d-flex justify-content-center">
-        <input type="text" name="ticker" class="form-control w-50" 
-               placeholder="Ingresa un símbolo (ej: AAPL)" required>
-        <button type="submit" class="btn btn-primary ms-2">
-            <i class="fas fa-search"></i> Analizar
-        </button>
-    </form>
+<div class="home-container">
+    <!-- Sección de búsqueda -->
+    <div class="search-container text-center mb-5">
+        <h1 class="mb-4">Analizador Financiero</h1>
+        <form action="/analyze" method="post" class="d-flex justify-content-center">
+            <input type="text" name="ticker" class="form-control w-50" 
+                   placeholder="Ingresa un símbolo (ej: AAPL)" required>
+            <button type="submit" class="btn btn-primary ms-2">
+                <i class="fas fa-search"></i> Analizar
+            </button>
+        </form>
+    </div>
+
+    <!-- Mercado en Tiempo Real -->
+    <div class="market-overview card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="fas fa-chart-bar me-2"></i>Mercado Global
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for item in market_data %}
+                <div class="col-md-4 mb-3">
+                    <div class="market-index p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-0">{{ item.name }}</h5>
+                                <small class="text-muted">{{ item.symbol }}</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="price">${{ item.price|round(2) }}</div>
+                                <div class="change {% if item.change > 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ item.change|round(2) }} ({{ item.percent_change|round(2) }}%)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico Interactivo -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <i class="fas fa-chart-line me-2"></i>Índice S&P 500 (Últimos 30 días)
+        </div>
+        <div class="card-body">
+            <div id="sp500-chart" style="height: 400px;"></div>
+        </div>
+    </div>
+
+    <!-- Acciones más Activas -->
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <i class="fas fa-rocket me-2"></i>Acciones más Activas
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Símbolo</th>
+                            <th>Nombre</th>
+                            <th>Precio</th>
+                            <th>Cambio</th>
+                            <th>% Cambio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in top_movers %}
+                        <tr>
+                            <td><a href="/analyze?ticker={{ stock.symbol }}" class="text-decoration-none">{{ stock.symbol }}</a></td>
+                            <td>{{ stock.name }}</td>
+                            <td>${{ stock.price|round(2) }}</td>
+                            <td class="{% if stock.change > 0 %}text-success{% else %}text-danger{% endif %}">
+                                ${{ stock.change|round(2) }}
+                            </td>
+                            <td class="{% if stock.percent_change > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ stock.percent_change|round(2) }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Scripts para gráficos -->
+<script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
+<script>
+    // Gráfico S&P 500
+    fetch('/sp500-data')
+        .then(response => response.json())
+        .then(data => {
+            Plotly.newPlot('sp500-chart', [{
+                x: data.dates,
+                y: data.prices,
+                type: 'line',
+                line: {color: '#1a73e8'},
+                name: 'S&P 500'
+            }], {
+                showlegend: false,
+                margin: {t: 30},
+                hovermode: 'x unified'
+            });
+        });
+</script>
 {% endblock %}
