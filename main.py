@@ -161,8 +161,8 @@ async def enviar_recomendaciones_diarias():
         logger.error(f"Error en recomendaciones: {str(e)}")
         if channel:
             await channel.send(f"⚠️ Error al generar recomendaciones: {str(e)}")
-    finally:
-        await bot.close()
+    #finally:
+       # await bot.close()
 
 @bot.command()
 async def analizar(ctx, ticker: str):
