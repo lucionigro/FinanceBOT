@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="recommendations-container">
+    <h2 class="mb-4">Recomendaciones de Mercado</h2>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <i class="fas fa-star me-2"></i>Top Oportunidades Corto Plazo
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Precio Actual</th>
+                            <th>Entrada Ideal</th>
+                            <th>Objetivo</th>
+                            <th>Señales Clave</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recommendations %}
+                        <tr>
+                            <td class="fw-bold">{{ rec.ticker }}</td>
+                            <td>{{ rec.price }}</td>
+                            <td>{{ rec.entry }}</td>
+                            <td class="text-success">{{ rec.target }}</td>
+                            <td>
+                                <ul class="signal-list">
+                                    {% for reason in rec.reasons %}
+                                    <li>{{ reason }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

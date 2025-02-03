@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-container text-center">
+    <h1 class="mb-4">Analizador Financiero</h1>
+    <form action="/analyze" method="post" class="d-flex justify-content-center">
+        <input type="text" name="ticker" class="form-control w-50" 
+               placeholder="Ingresa un símbolo (ej: AAPL)" required>
+        <button type="submit" class="btn btn-primary ms-2">
+            <i class="fas fa-search"></i> Analizar
+        </button>
+    </form>
+</div>
+{% endblock %}

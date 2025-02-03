@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="analysis-container">
+    <div class="header mb-4">
+        <h2 class="ticker-title">{{ ticker }}</h2>
+        <div class="price-display">
+            <span class="price">${{ "%.2f"|format(price) }}</span>
+            <span class="recommendation badge bg-{{ 'success' if recommendation == 'COMPRAR' else 'danger' if recommendation == 'NO COMPRAR' else 'warning' }}">
+                {{ recommendation }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-chart-line me-2"></i>Análisis Técnico
+                </div>
+                <div class="card-body">
+                    <div class="key-metrics mb-4">
+                        <div class="metric">
+                            <span class="metric-label">Precio Entrada Ideal</span>
+                            <span class="metric-value">${{ "%.2f"|format(entry_price) }}</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Objetivo Técnico</span>
+                            <span class="metric-value">${{ "%.2f"|format(target_price) }}</span>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mb-3">Indicadores Clave:</h5>
+                    <ul class="indicator-list">
+                        {% for reason in reasons %}
+                        <li class="indicator-item">
+                            <i class="fas fa-chevron-right me-2"></i>{{ reason }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-coins me-2"></i>Análisis Fundamental
+                </div>
+                <div class="card-body fundamental-analysis">
+                    {{ fundamental|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="time-horizon card mt-4">
+        <div class="card-header bg-warning text-dark">
+            <i class="fas fa-clock me-2"></i>Horizonte Temporal
+        </div>
+        <div class="card-body">
+            {{ time_analysis|replace('\n', '<br>')|safe }}
+        </div>
+    </div>
+</div>
+{% endblock %}

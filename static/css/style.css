@@ -1,0 +1,81 @@
+:root {
+    --primary-color: #1a73e8;
+    --success-color: #34a853;
+    --danger-color: #ea4335;
+    --warning-color: #f9ab00;
+    --text-primary: #202124;
+    --text-secondary: #5f6368;
+    --background-color: #f8f9fa;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    color: var(--text-primary);
+    background-color: var(--background-color);
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ticker-title {
+    font-size: 2.5rem;
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+.price-display {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.price {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    border-radius: 8px;
+}
+
+.card-header {
+    font-weight: 500;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.metric {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.metric-label {
+    color: var(--text-secondary);
+}
+
+.metric-value {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.indicator-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.indicator-item {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+    color: var(--text-secondary);
+}
+
+.fundamental-analysis {
+    white-space: pre-line;
+    line-height: 1.8;
+}
