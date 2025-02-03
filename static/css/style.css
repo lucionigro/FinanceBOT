@@ -79,3 +79,29 @@ body {
     white-space: pre-line;
     line-height: 1.8;
 }
+
+/* Colores nuevos */
+:root {
+    /* ... otros colores ... */
+    --purple-color: #6f42c1;
+}
+
+.ai-analysis .card-header {
+    background-color: var(--purple-color) !important;
+}
+
+.ai-content {
+    line-height: 1.7;
+    color: var(--text-primary);
+    white-space: pre-line;
+}
+
+.ai-content br {
+    margin-bottom: 1rem;
+    display: block;
+    content: "";
+}
+
+.bg-purple {
+    background-color: var(--purple-color);
+}

@@ -62,5 +62,17 @@
             {{ time_analysis|replace('\n', '<br>')|safe }}
         </div>
     </div>
+    <!-- Después de la sección de Horizonte Temporal -->
+    <div class="ai-analysis card mt-4">
+    <div class="card-header bg-purple text-white">
+        <i class="fas fa-robot me-2"></i>Análisis con DeepSeek AI
+    </div>
+    <div class="card-body">
+        <div class="ai-content">
+            {{ ai_analysis|replace('\n', '<br>')|safe }}
+        </div>
+        <small class="text-muted">Análisis generado por IA - Puede contener errores</small>
+    </div>
+    </div>
 </div>
 {% endblock %}

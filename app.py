@@ -247,6 +247,60 @@ def get_investment_recommendations():
     
     return recommendations
 
+# ------------------------------------------------------------------------------------
+# Sección 3: Análisis con DeepSeek (IA)
+# ------------------------------------------------------------------------------------
+
+def get_ai_analysis(ticker, technical_data, fundamental_analysis):
+    try:
+        import requests
+        import json
+        
+        # Prepara el prompt con los datos técnicos
+        technical_summary = "\n".join([f"- {d}" for d in technical_data])
+        prompt = f"""
+        Eres un experto analista financiero de Wall Street. Analiza el activo {ticker} considerando:
+        
+        **Datos Técnicos:**
+        {technical_summary}
+        
+        **Análisis Fundamental:**
+        {fundamental_analysis}
+        
+        Proporciona:
+        1. Análisis de sentimiento (1 párrafo)
+        2. Factores de riesgo clave (3-5 puntos)
+        3. Escenarios probables (Alcista/Neutral/Bajista)
+        4. Estrategia de trading recomendada
+        """
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}"
+        }
+        
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": "Eres un analista financiero experto en mercados bursátiles."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3
+        }
+        
+        response = requests.post("https://api.deepseek.com/v1/chat/completions", 
+                               headers=headers, 
+                               json=payload)
+        
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            return "⚠️ Error en el análisis de IA"
+            
+    except Exception as e:
+        print(f"Error en IA: {str(e)}")
+        return "No se pudo obtener análisis de IA"
+
 
 # Rutas Flask
 @app.route('/')
@@ -264,6 +318,9 @@ def analyze():
     recommendation, reasons, time_analysis = generate_recommendation(data, latest)
     fundamental = get_fundamental_analysis(ticker)
     
+    # Nueva sección: Análisis con IA
+    ai_analysis = get_ai_analysis(ticker, reasons, fundamental)
+    
     price = latest['Close']
     entry_price = latest['LowerBand'] if latest['BB_Percent'] < 30 else latest['SMA20']
     target_price = latest['UpperBand']
@@ -276,7 +333,8 @@ def analyze():
                           target_price=target_price,
                           reasons=reasons,
                           time_analysis=time_analysis,
-                          fundamental=fundamental)
+                          fundamental=fundamental,
+                          ai_analysis=ai_analysis)  # Nuevo parámetro
 
 @app.route('/recommendations')
 def recommendations():
