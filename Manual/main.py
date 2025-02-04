@@ -379,7 +379,65 @@ def find_intraday_opportunities():
         reverse=True
     )
 
+def show_glossary():
+    print("\n📚 Glosario de Conceptos de Trading")
+    print("\n=== Análisis Técnico ===")
+    print("""
+- SMA (Media Móvil Simple): Promedio del precio de cierre durante un período específico. 
+  Ej: SMA20 = tendencia corto plazo, SMA50 = mediano plazo.
 
+- RSI (Índice de Fuerza Relativa): Indicador de momentum (0-100). 
+  >70 = sobrecompra, <30 = sobreventa.
+
+- MACD: Relación entre dos medias móviles exponenciales (12 y 26 días). 
+  Cruce arriba de la línea de señal = momentum alcista.
+
+- Bandas de Bollinger: SMA20 + 2 desviaciones estándar (superior), 
+  SMA20 - 2 desviaciones estándar (inferior). Precio cerca de la banda 
+  inferior = posible rebote, cerca de superior = posible corrección.
+
+- Volumen Promedio: Cantidad promedio de acciones negociadas. 
+  Volumen alto confirma fuerza en la tendencia.
+    """)
+    
+    print("\n=== Análisis Fundamental ===")
+    print("""
+- Ratio P/E (Precio/Beneficio): Precio por acción dividido por ganancias 
+  por acción. Alto = posible sobrevaloración.
+
+- Ratio P/B (Precio/Valor Contable): Compara valor de mercado con valor 
+  contable. Útil para empresas con muchos activos tangibles.
+
+- ROE (Retorno sobre Patrimonio): Beneficios netos / patrimonio de accionistas. 
+  Mide eficiencia en uso de capital.
+
+- EPS (Ganancias por Acción): Beneficio neto dividido por acciones en circulación. 
+  Indica rentabilidad por acción.
+
+- Capitalización de Mercado: Precio acción × acciones en circulación. 
+  Clasifica empresas por tamaño (pequeña, mediana, gran capitalización).
+
+- Dividend Yield: Dividendo anual / precio acción. Muestra rendimiento por dividendos.
+
+- Deuda/Patrimonio: Deuda total / patrimonio accionistas. Alto ratio = mayor riesgo.
+
+- Flujo de Caja Libre: Efectivo disponible después de operaciones e inversiones. 
+  Alto = capacidad para pagar deudas/dividendos.
+
+- Margen Operativo: (Beneficio operativo / ingresos) × 100. 
+  Eficiencia en operaciones principales.
+
+- Crecimiento de Ingresos: % de aumento anual en ventas. 
+  Crecimiento consistente = negocio saludable.
+
+- Ratio PEG: P/E ÷ tasa crecimiento ganancias. <1 = acción posiblemente subvalorada.
+
+- EBITDA: Beneficios antes de intereses, impuestos, depreciación y amortización. 
+  Mide rentabilidad operativa bruta.
+
+- Ratio Corriente: Activos corrientes / pasivos corrientes. 
+  >1 = buena capacidad para pagar obligaciones a corto plazo.
+    """)
 
 # ------------------------------------------------------------------------------------
 # Interfaz de Usuario
@@ -394,8 +452,9 @@ def main_menu():
     print_header()
     print("\n1. Analizar activo individual")
     print("2. Obtener recomendaciones del día")
-    print("3. Buscar oportunidades intradía")  # Nueva opción
-    print("4. Salir")
+    print("3. Buscar oportunidades intradía")
+    print("4. Glosario (Explicación de conceptos)")
+    print("5. Salir")
     return input("\nSeleccione una opción: ")
 
 def show_intraday_opportunities():
@@ -481,9 +540,11 @@ def main():
             analyze_single_ticker()
         elif choice == '2':
             show_daily_recommendations()
-        elif choice == '3':  # Nueva opción
+        elif choice == '3':
             show_intraday_opportunities()
-        elif choice == '4':
+        elif choice == '4':  # Nueva opción de glosario
+            show_glossary()
+        elif choice == '5':  # Opción Salir movida a 5
             print("\n✅ Sesión finalizada")
             break
         else:
