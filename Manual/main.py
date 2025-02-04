@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 import requests
 import config
-
+import concurrent.futures
 
 # ------------------------------------------------------------------------------------
 # Sección 1: Análisis Técnico Mejorado
@@ -13,10 +13,11 @@ import config
 def get_technical_analysis(ticker):
     try:
         stock = yf.Ticker(ticker)
-        hist = stock.history(period="6mo")
+        hist = stock.history(period="6mo", timeout=10)  # Timeout de 10 segundos
         
         if hist.empty:
             return None, "No hay datos suficientes para este ticker."
+
         
         # Media Móvil Simple (SMA)
         hist['SMA20'] = hist['Close'].rolling(window=20).mean()
@@ -35,7 +36,7 @@ def get_technical_analysis(ticker):
         hist['MACD'] = hist['EMA12'] - hist['EMA26']
         hist['Signal'] = hist['MACD'].ewm(span=9, adjust=False).mean()
         
-        # Bollinger Bands (SMA20 ± 2 desviaciones estándar)
+        # Bollinger Bands
         hist['STD'] = hist['Close'].rolling(window=20).std()
         hist['UpperBand'] = hist['SMA20'] + (2 * hist['STD'])
         hist['LowerBand'] = hist['SMA20'] - (2 * hist['STD'])
@@ -47,7 +48,7 @@ def get_technical_analysis(ticker):
         lower = latest['LowerBand']
         latest['BB_Percent'] = ((price - lower) / (upper - lower)) * 100
         
-        # Volumen promedio (últimos 5 días)
+        # Volumen promedio
         latest['AvgVolume'] = hist['Volume'].tail(5).mean()
         
         return hist, latest
@@ -60,6 +61,11 @@ def get_fundamental_analysis(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         
+        # Calcular PEG Ratio
+        pe_ratio = info.get('trailingPE', None)
+        growth_rate = info.get('earningsGrowth', None)
+        peg_ratio = pe_ratio / growth_rate if (pe_ratio and growth_rate) else 'N/A'
+        
         fundamental = {
             'P/E Ratio': info.get('trailingPE', 'N/A'),
             'P/B Ratio': info.get('priceToBook', 'N/A'),
@@ -67,22 +73,45 @@ def get_fundamental_analysis(ticker):
             'EPS': info.get('trailingEps', 'N/A'),
             'Market Cap': info.get('marketCap', 'N/A'),
             'Dividend Yield': info.get('dividendYield', 'N/A'),
-            'Debt/Equity': info.get('debtToEquity', 'N/A')
+            'Debt/Equity': info.get('debtToEquity', 'N/A'),
+            'Free Cash Flow': info.get('freeCashflow', 'N/A'),
+            'Operating Margin': info.get('operatingMargins', 'N/A'),
+            'Revenue Growth': info.get('revenueGrowth', 'N/A'),
+            'PEG Ratio': peg_ratio,
+            'EBITDA': info.get('ebitda', 'N/A'),
+            'Current Ratio': info.get('currentRatio', 'N/A')
         }
         
-        # Formatear valores numéricos
-        if isinstance(fundamental['Market Cap'], float):
-            fundamental['Market Cap'] = f"${fundamental['Market Cap']/1e9:.2f}B"
+        # Formatear valores
+        formatadores = {
+            'Market Cap': lambda x: f"${x/1e9:.2f}B" if isinstance(x, (int, float)) else x,
+            'Free Cash Flow': lambda x: f"${x/1e6:.2f}M" if isinstance(x, (int, float)) else x,
+            'Operating Margin': lambda x: f"{x*100:.2f}%" if isinstance(x, float) else x,
+            'Revenue Growth': lambda x: f"{x*100:.2f}%" if isinstance(x, float) else x,
+            'PEG Ratio': lambda x: f"{x:.2f}" if isinstance(x, float) else x,
+            'EBITDA': lambda x: f"${x/1e9:.2f}B" if isinstance(x, (int, float)) else x,
+            'Current Ratio': lambda x: f"{x:.2f}" if isinstance(x, float) else x,
+            'Dividend Yield': lambda x: f"{x*100:.2f}%" if isinstance(x, float) else x
+        }
+        
+        for key, formatter in formatadores.items():
+            fundamental[key] = formatter(fundamental[key])
             
         analysis = [
             "📊 Análisis Fundamental:",
-            f"- 📈 Ratio P/E (Valoración): {fundamental['P/E Ratio']}",
-            f"- 📉 Ratio P/B (Valoración): {fundamental['P/B Ratio']}",
-            f"- 💹 ROE (Rentabilidad): {fundamental['ROE']}",
-            f"- 💵 EPS (Beneficios): {fundamental['EPS']}",
+            f"- 📈 Ratio P/E: {fundamental['P/E Ratio']}",
+            f"- 📉 Ratio P/B: {fundamental['P/B Ratio']}",
+            f"- 💹 ROE: {fundamental['ROE']}",
+            f"- 💵 EPS: {fundamental['EPS']}",
             f"- 🏦 Capitalización: {fundamental['Market Cap']}",
             f"- 📊 Deuda/Patrimonio: {fundamental['Debt/Equity']}",
-            f"- 💰 Dividendo: {fundamental['Dividend Yield'] or '0'}%"
+            f"- 💰 Dividendo: {fundamental['Dividend Yield'] or '0%'}",
+            f"- 💵 Flujo Caja Libre: {fundamental['Free Cash Flow']}",
+            f"- 📈 Margen Operativo: {fundamental['Operating Margin']}",
+            f"- 🚀 Crecimiento Ingresos: {fundamental['Revenue Growth']}",
+            f"- 🎯 Ratio PEG: {fundamental['PEG Ratio']}",
+            f"- 📉 EBITDA: {fundamental['EBITDA']}",
+            f"- ⚖️ Ratio Corriente: {fundamental['Current Ratio']}"
         ]
         
         return "\n".join(analysis)
@@ -94,84 +123,80 @@ def generate_recommendation(hist, latest_data):
     reasons = []
     price = latest_data['Close']
     
-    # 1. Comparar SMA20 y SMA50
+    # 1. Medias móviles
     sma20 = latest_data['SMA20']
     sma50 = latest_data['SMA50']
     trend = "alcista📈" if sma20 > sma50 else "bajista📉"
-    reasons.append(f"SMA20 (${sma20:.2f}) < SMA50 (${sma50:.2f}) → Tendencia {trend}")
+    reasons.append(f"SMA20 (${sma20:.2f}) vs SMA50 (${sma50:.2f}) → Tendencia {trend}")
     
-     # 2. RSI
+    # 2. RSI
     rsi = latest_data['RSI']
     if rsi < 30:
-        reasons.append(f" RSI: {rsi:.2f} (Sobreventa, <30)")
+        reasons.append(f"RSI: {rsi:.2f} (Sobreventa)")
     elif rsi > 70:
-        reasons.append(f" RSI: {rsi:.2f} (Sobrecompra, >70)")
+        reasons.append(f"RSI: {rsi:.2f} (Sobrecompra)")
     else:
-        reasons.append(f" RSI: {rsi:.2f} (Neutral)")
+        reasons.append(f"RSI: {rsi:.2f} (Neutral)")
     
-    
-    # 3. MACD
+    # 3. MACD (Corregido emojis)
     macd = latest_data['MACD']
     signal = latest_data['Signal']
     if macd > signal:
-        reasons.append(f"MACD ({macd:.2f}) > Señal ({signal:.2f}) → Momentum alcista📉")
+        reasons.append(f"MACD ({macd:.2f}) > Señal ({signal:.2f}) → Momentum alcista📈")
     else:
-        reasons.append(f"MACD ({macd:.2f}) < Señal ({signal:.2f}) → Momentum bajista📈")
+        reasons.append(f"MACD ({macd:.2f}) < Señal ({signal:.2f}) → Momentum bajista📉")
     
     # 4. Bollinger Bands
     bb_percent = latest_data['BB_Percent']
     if bb_percent > 80:
-        reasons.append(f"Bollinger Bands: Precio cerca de banda superior ({bb_percent:.2f}%)")
+        reasons.append(f"Bollinger: {bb_percent:.2f}% (Zona superior)")
     elif bb_percent < 20:
-        reasons.append(f"Bollinger Bands: Precio cerca de banda inferior ({bb_percent:.2f}%)")
+        reasons.append(f"Bollinger: {bb_percent:.2f}% (Zona inferior)")
     else:
-        reasons.append(f"Bollinger Bands: Precio en zona media ({bb_percent:.2f}%)")
+        reasons.append(f"Bollinger: {bb_percent:.2f}% (Zona media)")
     
     # 5. Volumen
     avg_volume = latest_data['AvgVolume']
     latest_volume = latest_data['Volume']
     if latest_volume > avg_volume * 1.5:
-        reasons.append(f"Volumen actual ({latest_volume:.0f}) > Promedio ({avg_volume:.0f}) → Alta actividad")
+        reasons.append(f"Volumen +150%: {latest_volume:.0f} vs {avg_volume:.0f}")
     
-    # Decisión final
+    # Puntuación
     buy_score = sum([
         1 if "alcista" in reason else 
         -1 if "bajista" in reason else 
         0 for reason in reasons
     ])
     
-    # Recomendación de plazo temporal
+    # Horizonte temporal
     time_horizon = []
     time_reasons = []
     
-    # Corto plazo (1-4 semanas)
+    # Corto plazo
     if (macd > signal) and (30 < rsi < 70) and (price > sma20):
         time_horizon.append("corto plazo")
-        time_reasons.append("Momentum positivo con indicadores técnicos favorables para movimientos recientes")
+        time_reasons.append("Momentum positivo reciente")
     
-    # Mediano plazo (1-6 meses)
-    if (sma20 > sma50) and (hist['SMA20'].iloc[-10] < sma20) and (hist['SMA50'].iloc[-20] < sma50):
+    # Mediano plazo
+    if (sma20 > sma50) and (hist['SMA20'].iloc[-10] < sma20):
         time_horizon.append("mediano plazo") 
-        time_reasons.append("Tendencia intermedia positiva con cruce alcista de medias móviles")
+        time_reasons.append("Tendencia intermedia positiva")
     
-    # Largo plazo (>6 meses)
+    # Largo plazo
     if (sma50 > hist['SMA50'].iloc[-60]) and (price > sma50):
         time_horizon.append("largo plazo")
-        time_reasons.append("Tendencia secular alcista y fundamentos sólidos para crecimiento sostenido")
+        time_reasons.append("Tendencia secular alcista")
     
-    # Determinar recomendación final
+    # Recomendación final
     if buy_score > 1:
-        recommendation = "COMPRAR"
+        recommendation = "COMPRAR🚀"
     elif buy_score < -1:
-        recommendation = "NO COMPRAR"
+        recommendation = "NO COMPRAR⛔"
     else:
-        recommendation = "NEUTRAL"
+        recommendation = "NEUTRAL⚖️"
     
-    # Formatear horizonte temporal
-    if not time_horizon:
-        time_str = "No se recomienda para ningún horizonte temporal específico"
-    else:
-        time_str = f"Recomendado para: {', '.join(time_horizon)}\n" + "\n".join(time_reasons)
+    # Formatear horizonte
+    time_str = "\n".join(time_reasons) if time_reasons else "Sin horizonte claro"
     
     return recommendation, reasons, time_str
 
@@ -180,194 +205,291 @@ def generate_recommendation(hist, latest_data):
 # ------------------------------------------------------------------------------------
 
 def send_telegram_message(message):
+    if not all([config.TELEGRAM_TOKEN, config.TELEGRAM_CHAT_ID]):
+        return False
+    
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "Markdown"
     }
-    response = requests.post(url, json=payload)
-    return response.ok
-
-def load_sp500_tickers(csv_path=config.CSV_PATH):
-    """Carga los tickers del S&P 500 desde un archivo CSV."""
     try:
-        df = pd.read_csv(csv_path)
-        if 'Symbol' in df.columns:
-            return df['Symbol'].tolist()
-        else:
-            print("Error: El archivo CSV no tiene una columna 'Symbol'.")
-            return []
-    except Exception as e:
-        print(f"Error al cargar el archivo CSV: {e}")
-        return []
+        response = requests.post(url, json=payload)
+        return response.ok
+    except:
+        return False
 
+def load_sp500_tickers():
+    try:
+        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+        df = pd.read_html(url)[0]  # Lee la primera tabla
+        tickers = df['Symbol'].tolist()  # Extrae la primera columna con los tickers
+        tickers = [ticker.replace('.', '-') for ticker in tickers]  # Limpieza básica
+        return tickers
+    except Exception as e:
+        print(f"Error al cargar tickers: {e}")
+        return ['NVDA', 'TSLA', 'AAPL', 'AMD', 'META', 'AMZN', 'GOOG', 'MSFT']
+
+# Función que procesa un solo ticker
+def process_ticker(ticker):
+    try:
+        data, latest = get_technical_analysis(ticker)
+        if data is None or latest is None:
+            return None
+        
+        
+        recommendation, reasons, time_analysis = generate_recommendation(data, latest)
+        
+        if recommendation == "COMPRAR🚀" and "corto plazo" in time_analysis:
+            entry_price = latest['LowerBand'] if latest['BB_Percent'] < 30 else latest['SMA20']
+            return {
+                'ticker': ticker,
+                'price': latest['Close'],
+                'entry': entry_price,
+                'target': latest['UpperBand'],
+                'reasons': reasons[:3]
+            }
+    except Exception as e:
+         print(f"Error procesando {ticker}: {e}")  # Opcional: descomentar para debug
+    return None
 
 def get_investment_recommendations():
     tickers = load_sp500_tickers()
-    
-    if not tickers:
-        print("No se pudieron cargar los tickers. Usando lista por defecto.")
-        tickers = ['NVDA', 'TSLA', 'AAPL', 'AMD', 'META', 'AMZN', 'GOOG', 'MSFT', 'BTC-USD', 'ETH-USD']
     recommendations = []
+    batch_size = 50  # Procesar 50 tickers a la vez
+    max_recommendations = 5  # Límite de recomendaciones a retornar
+
+    # Dividir la lista de tickers en batches
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]  # Obtener el siguiente batch de tickers
+        print(f"Procesando batch {i//batch_size + 1}: {len(batch)} tickers")
+
+        # Procesar el batch actual con concurrencia
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(process_ticker, ticker): ticker for ticker in batch}
+
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        result = future.result(timeout=15)  # Timeout por futuro
+                        if result:
+                            recommendations.append(result)
+                            if len(recommendations) >= max_recommendations:
+                                break
+                    except (concurrent.futures.TimeoutError, Exception) as e:
+                        continue
+
+            finally:
+                # Cancelar todas las tareas pendientes en este batch
+                for f in futures:
+                    f.cancel()
+                executor.shutdown(wait=False)
+
+        # Detener el procesamiento si ya se alcanzó el límite de recomendaciones
+        if len(recommendations) >= max_recommendations:
+            break
+
+    return recommendations[:max_recommendations]
+
+def get_intraday_analysis(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="1d", interval="5m")  # Datos intradía cada 5 minutos
+        
+        if hist.empty:
+            return None, "No hay datos intradía para este ticker."
+        
+        # Calcular cambios porcentuales y volumen promedio
+        hist['PctChange'] = hist['Close'].pct_change() * 100
+        avg_volume = hist['Volume'].mean()
+        
+        # Último dato
+        latest = hist.iloc[-1].copy()
+        latest['AvgVolume'] = avg_volume
+        
+        return hist, latest
     
-    for ticker in tickers:
+    except Exception as e:
+        return None, f"Error: {str(e)}"
+    
+    
+
+def find_intraday_opportunities():
+    tickers = load_sp500_tickers()
+    opportunities = []
+    batch_size = 50  # Procesar 50 tickers por lote
+    max_opportunities = 5  # Máximo de oportunidades a retornar
+    
+    # Función para procesar un ticker individual
+    def process_intraday_ticker(ticker):
         try:
-            data, latest = get_technical_analysis(ticker)
-            if data is None:
-                continue
-                
-            recommendation, reasons, time_analysis = generate_recommendation(data, latest)
+            data, latest = get_intraday_analysis(ticker)
+            if data is None or latest is None:
+                return None
             
-            # Filtrar solo recomendaciones COMPRAR con horizonte corto plazo
-            if recommendation == "COMPRAR" and "corto plazo" in time_analysis:
-                price = latest['Close']
-                entry_price = latest['LowerBand'] if latest['BB_Percent'] < 30 else latest['SMA20']
-                
-                reasons_filtered = [
-                    r for r in reasons 
-                    if any(keyword in r for keyword in ['SMA20', 'RSI', 'MACD', 'Bollinger', 'Volumen'])
-                ][:3]  # Mostrar solo las 3 señales más fuertes
-                
-                recommendations.append({
+            pct_change = latest.get('PctChange', 0)
+            avg_volume = latest.get('AvgVolume', 1)  # Evitar división por cero
+            volume_ratio = latest['Volume'] / avg_volume if avg_volume != 0 else 0
+            
+            if pct_change > 2 and volume_ratio > 2:
+                return {
                     'ticker': ticker,
-                    'price': f"${price:.2f}",
-                    'entry': f"${entry_price:.2f}",
-                    'target': f"${latest['UpperBand']:.2f}",
-                    'reasons': reasons_filtered
-                })
-                
-                if len(recommendations) >= 5:
-                    break
-                    
+                    'price': latest['Close'],
+                    'pct_change': pct_change,
+                    'volume_ratio': volume_ratio,
+                    'timestamp': latest.name.strftime("%H:%M")  # Hora del último dato
+                }
+            return None
+            
         except Exception as e:
-            continue
+            # print(f"Error en {ticker}: {str(e)}")  # Descomentar para debug
+            return None
+
+    # Procesamiento por batches
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        print(f"Procesando batch intradía {i//batch_size + 1}: {len(batch)} tickers")
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:  # Más workers para velocidad
+            futures = {executor.submit(process_intraday_ticker, ticker): ticker for ticker in batch}
+            
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    result = future.result(timeout=10)  # Timeout más ajustado
+                    if result:
+                        opportunities.append(result)
+                        if len(opportunities) >= max_opportunities:
+                            break
+            except concurrent.futures.TimeoutError:
+                continue
+            finally:
+                # Limpieza de recursos
+                for f in futures:
+                    f.cancel()
+                executor.shutdown(wait=False)
+        
+        if len(opportunities) >= max_opportunities:
+            break
     
-    return recommendations
+    # Ordenar por mejor oportunidad
+    return sorted(
+        opportunities[:max_opportunities], 
+        key=lambda x: (x['pct_change'], x['volume_ratio']), 
+        reverse=True
+    )
+
 
 
 # ------------------------------------------------------------------------------------
-# Interfaz de Usuario (CLI) Actualizada
+# Interfaz de Usuario
 # ------------------------------------------------------------------------------------
+
+def print_header():
+    print("\n" + "="*40)
+    print(f"=== TradingBot v1.0 - {datetime.now().strftime('%d/%m/%Y %H:%M')} ===")
+    print("="*40)
+
+def main_menu():
+    print_header()
+    print("\n1. Analizar activo individual")
+    print("2. Obtener recomendaciones del día")
+    print("3. Buscar oportunidades intradía")  # Nueva opción
+    print("4. Salir")
+    return input("\nSeleccione una opción: ")
+
+def show_intraday_opportunities():
+    print("\n🔎 Buscando oportunidades intradía...")
+    opportunities = find_intraday_opportunities()
+    
+    if not opportunities:
+        print("\n⚠️ No se encontraron oportunidades intradía fuertes")
+        return
+    
+    print(f"\n🔥 Top {len(opportunities)} oportunidades intradía:")
+    for idx, opp in enumerate(opportunities, 1):
+        print(f"""{idx}. {opp['ticker']}
+                Precio actual: ${opp['price']:.2f}
+                Cambio (%): {opp['pct_change']:.2f}%
+                Volumen: {opp['volume_ratio']:.1f}x promedio
+                Hora detección: {opp['timestamp']}""")
+                
+
+def analyze_single_ticker():
+    ticker = input("\nIngrese el símbolo del activo (ej: BTC-USD): ").upper()
+    data, latest = get_technical_analysis(ticker)
+    
+    if data is None:
+        print(f"\n❌ Error: {latest}")
+        return
+    
+    recommendation, reasons, time_analysis = generate_recommendation(data, latest)
+    price = latest['Close']
+    
+    print(f"\n📈 Análisis de {ticker} - ${price:.2f}")
+    print(f"\n🔥 Recomendación: {recommendation}")
+    
+    if recommendation == "COMPRAR🚀":
+        entry = latest['LowerBand'] if latest['BB_Percent'] < 30 else latest['SMA20']
+        print(f"\n🎯 Entrada: ${entry:.2f}")
+        print(f"🎯 Objetivo: ${latest['UpperBand']:.2f}")
+    
+    print("\n🔍 Señales técnicas:")
+    for reason in reasons:
+        print(f" - {reason}")
+    
+    print("\n📅 Horizonte temporal:")
+    print(time_analysis)
+    
+    print("\n" + get_fundamental_analysis(ticker))
+    
+    #if input("\n¿Enviar a Telegram? (s/n): ").lower() == 's':
+     #   telegram_msg = (
+      #      f"*{ticker} - ${price:.2f}*\n"
+      #      f"Recomendación: {recommendation}\n"
+       #     f"Señales:\n- " + "\n- ".join(reasons) + 
+       #     f"\n\nFundamentales:\n{get_fundamental_analysis(ticker)}"
+       # )
+      #  if send_telegram_message(telegram_msg):
+       #     print("✅ Mensaje enviado")
+      #  else:
+       #     print("❌ Error en el envío")
+
+def show_daily_recommendations():
+    print("\n🔎 Buscando oportunidades...")
+    recommendations = get_investment_recommendations()
+    
+    if not recommendations:
+        print("\n⚠️ No se encontraron oportunidades fuertes")
+        return
+    
+    print("\n🔥 Top oportunidades detectadas:")
+    for idx, asset in enumerate(recommendations, 1):
+        print(f"\n{idx}. {asset['ticker']}")
+        print(f"   Precio actual: ${asset['price']:.2f}")
+        print(f"   Entrada ideal: ${asset['entry']:.2f}")
+        print(f"   Objetivo: ${asset['target']:.2f}")
+        print("   Señales destacadas:")
+        for reason in asset['reasons'][:2]:
+            print(f"    - {reason}")
 
 def main():
     while True:
-        print("\n=== BOT FINANCIERO  ===")
-        print("1. Analizar un ticker")
-        print("2. Registrar una compra")
-        print("3. Obtener recomendaciones del mercado Americano")
-        print("4. Salir")
+        choice = main_menu()
         
-        choice = input("Selecciona una opción: ")
-        
-        if choice == "1":
-            ticker = input("Ingresa el ticker (ej: NVDA): ").upper()
-            data, latest = get_technical_analysis(ticker)
-            
-            if data is None:
-                print(latest)
-                continue
-            
-            recommendation, reasons, time_analysis = generate_recommendation(data, latest)
-            price = latest['Close']
-
-            entry_price = None
-            target_price = None
-            if recommendation == "COMPRAR":
-                if latest['BB_Percent'] < 30:
-                    entry_price = latest['LowerBand']
-                else:
-                    entry_price = latest['SMA20']
-                target_price = latest['UpperBand']
-            
-            # Resultado en consola
-            print(f"\n📊 Análisis para {ticker} (Precio: ${price:.2f})")
-            print(f"🚨 Recomendación: {recommendation}")
-
-            if recommendation == "COMPRAR":
-                print(f"💡 Precio de entrada ideal: ${entry_price:.2f}")
-                print(f"🎯 Objetivo técnico: ${target_price:.2f}")
-                entry_target_msg = f"\n\n🎯 *Precios Clave:*\n- Precio de Entrada: ${entry_price:.2f}\n- Precio Objetivo: ${target_price:.2f}"
-
-            
-            else: entry_target_msg = ""  # Si no es "COMPRAR", no se agrega nada
-
-                
-                
-            print("\n🔍 Detalles Técnicos:")
-            for reason in reasons:
-                print(f"- {reason}")
-            print("\n⏳ Horizonte Temporal:")
-            print(time_analysis)
-            
-
-            
-            # Análisis Fundamental
-            fundamental_analysis = get_fundamental_analysis(ticker)
-            print("\n📈 Análisis Fundamental:")
-            print(fundamental_analysis)
-            
-            # Enviar a Telegram
-            telegram_msg = (
-                f"*📊Análisis de {ticker}*\n"
-                f"Precio: ${price:.2f}\n"
-                f"🚨Recomendación: {recommendation}"
-                f"{entry_target_msg}\n\n"  # Aquí se inserta el mensaje con precios clave
-
-                "🔍Detalles Técnicos:\n- " + "\n- ".join(reasons) + "\n\n"
-                "⏳Horizonte Temporal:\n" + time_analysis + "\n\n"
-                "📈Análisis Fundamental:\n" + fundamental_analysis 
-            )
-
-            if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
-                success = send_telegram_message(telegram_msg)
-                if success:
-                    print("\n✅ Notificación enviada a Telegram.")
-                else:
-                    print("\n❌ Error al enviar a Telegram.")
-                
-        elif choice == "2":
-            ticker = input("Ticker comprado (ej: TSLA): ").upper()
-            price = float(input("Precio por acción: "))
-            quantity = int(input("Cantidad: "))
-            save_purchase(ticker, price, quantity)
-            print("¡Compra registrada exitosamente!")
-        
-        elif choice == "3":  # Nueva opción de recomendaciones
-            print("\n🔎 Analizando oportunidades de mercado...")
-            recommendations = get_investment_recommendations()
-            
-            if not recommendations:
-                print("\n⚠️ No se encontraron oportunidades fuertes para corto plazo")
-                continue
-                
-            print(f"\n🚀 Top 5 Recomendaciones Corto Plazo ({datetime.now().strftime('%d/%m')}):")
-            for i, asset in enumerate(recommendations, 1):
-                print(f"\n{i}. {asset['ticker']}")
-                print(f"   📊 Precio Actual: {asset['price']}")
-                print(f"   💵Precio Entrada Ideal: {asset['entry']}")
-                print(f"   📈Objetivo Técnico: {asset['target']}")
-                print("   Señales Técnicas:")
-                for reason in asset['reasons']:
-                    print(f"   - {reason}")
-        
-
-            # Enviar por Telegram
-            if config.TELEGRAM_TOKEN and config.TELEGRAM_CHAT_ID:
-                telegram_msg = "📈 *Recomendaciones Corto Plazo:*\n\n"
-                for asset in recommendations:
-                    telegram_msg += (
-                        f"🏅 *{asset['ticker']}*\n"
-                        f"- Precio: {asset['price']}\n"
-                        f"- Entrada: {asset['entry']}\n"
-                        f"- Objetivo: {asset['target']}\n"
-                        f"- Señales:\n   • " + "\n   • ".join(asset['reasons']) + "\n\n"
-                    )
-                send_telegram_message(telegram_msg)
-
-        elif choice == "4":  # Actualizado
-            print("¡Hasta luego!")
+        if choice == '1':
+            analyze_single_ticker()
+        elif choice == '2':
+            show_daily_recommendations()
+        elif choice == '3':  # Nueva opción
+            show_intraday_opportunities()
+        elif choice == '4':
+            print("\n✅ Sesión finalizada")
             break
+        else:
+            print("\n❌ Opción inválida")
+        
+        input("\nPresione Enter para continuar...")
 
 if __name__ == "__main__":
     main()

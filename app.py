@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 import config
 
+
 app = Flask(__name__)
 
 # Funciones existentes (get_technical_analysis, get_fundamental_analysis, generate_recommendation, get_investment_recommendations)
@@ -547,16 +548,39 @@ def portfolio():
             }
             
             save_to_portfolio(new_entry)
-            
+            perfo=calculate_portfolio_performance()
+            for asset in perfo:
+                for entry in asset['entries']:
+                    if isinstance(entry['purchase_date'], str):
+                        entry['purchase_date'] = datetime.strptime(entry['purchase_date'], '%Y-%m-%d')
+
+        
+             
         except Exception as e:
             return render_template('portfolio.html', 
                                 performance=calculate_portfolio_performance(),
                                 error=str(e))
-    
+   
     return render_template('portfolio.html',
                          performance=calculate_portfolio_performance(),
                          totals=calculate_total_values(calculate_portfolio_performance()))
 
+
+
+
+@app.template_filter('datetimeformat')
+def datetimeformat(value, format='%d %b %Y'):
+    if isinstance(value, str):
+        value = datetime.strptime(value, '%Y-%m-%d')
+    return value.strftime(format)
+
+
+@app.template_filter('number_format')
+def number_format(value, decimals=2):
+    try:
+        return "{:,.{}f}".format(float(value), decimals)
+    except:
+        return value
 
 if __name__ == '__main__':
     app.run(debug=True)

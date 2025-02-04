@@ -63,34 +63,44 @@
                     </div>
                     
                     <!-- Entradas individuales (dropdown) -->
-                    <div class="collapse" id="entries{{ loop.index }}">
-                        <div class="p-3 bg-light">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Cantidad</th>
-                                        <th>Precio Compra</th>
-                                        <th>Inversión</th>
-                                        <th>Ganancia</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for entry in asset.entries %}
-                                    <tr>
-                                        <td>{{ entry.purchase_date }}</td>
-                                        <td>{{ entry.quantity }}</td>
-                                        <td>${{ entry.purchase_price }}</td>
-                                        <td>${{ (entry.quantity * entry.purchase_price)|round(2) }}</td>
-                                        <td class="{% if (asset.current_price - entry.purchase_price) > 0 %}text-success{% else %}text-danger{% endif %}">
-                                            ${{ ((asset.current_price - entry.purchase_price) * entry.quantity)|round(2) }}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                    <!-- Dentro del collapse, modifica la tabla así: -->
+                    <!-- Dentro del collapse -->
+                <div class="collapse" id="entries{{ loop.index }}">
+                    <div class="p-3 bg-light">
+                        <table class="table modern-table">
+                            <thead>
+                                <tr class="table-header">
+                                    <th class="ps-4">Fecha</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Precio Compra</th>
+                                    <th class="text-end">Inversión</th>
+                                    <th class="text-end pe-4">Ganancia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in asset.entries %}
+                                <tr class="position-relative">
+                                    <td class="ps-4 text-nowrap">{{ entry.purchase_date|datetimeformat('%d %b %Y') }}</td>
+                                    <td class="text-end">{{ entry.quantity|number_format(0) }}</td>
+                                    <td class="text-end">${{ entry.purchase_price|number_format(2) }}</td>
+                                    <td class="text-end">${{ (entry.quantity * entry.purchase_price)|number_format(2) }}</td>
+                                    <td class="text-end pe-4">
+                                        {% set gain = (asset.current_price - entry.purchase_price) * entry.quantity %}
+                                        <span class="gain-pill {% if gain > 0 %}gain-positive{% else %}gain-negative{% endif %}">
+                                            ${{ gain|number_format(2) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
+
+
+
+<!-- Y agrega este filtro en app.py para formatear fechas: -->
+
                 </div>
                 {% endfor %}
             {% else %}
@@ -103,3 +113,61 @@
     </div>
 </div>
 {% endblock %}
+
+<!-- Agrega este estilo en tu CSS: -->
+<style>
+    .modern-table {
+        font-size: 0.9rem;
+        border-collapse: separate;
+        border-spacing: 0 0.5rem;
+    }
+    
+    .modern-table thead {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .modern-table th {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    
+    .modern-table td, .modern-table th {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+        vertical-align: middle;
+    }
+    
+    .modern-table tr {
+        background: white;
+        transition: all 0.2s;
+    }
+    
+    .modern-table tr:hover {
+        background-color: #f8fafd;
+        transform: translateX(4px);
+    }
+    
+    .gain-pill {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-weight: 500;
+        min-width: 85px;
+        display: inline-block;
+        text-align: center;
+    }
+    
+    .gain-positive {
+        background-color: #d1fae5;
+        color: #059669;
+    }
+    
+    .gain-negative {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    
+    .table-header {
+        border-bottom: 2px solid #dee2e6;
+    }
+    </style>
